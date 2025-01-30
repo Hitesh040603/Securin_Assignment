@@ -49,7 +49,7 @@
             </tr>
         </thead>
         <tbody>
-            <!-- Data rows will be inserted here -->
+            <!-- Data inserted here -->
         </tbody>
     </table>
     
@@ -73,7 +73,7 @@
         let totalPages = 1;
         let resultsPerPage = 10;
 
-        // Function to fetch CVE data from the backend API
+        // Function to fetch CVE data from the backend
         async function loadCves() {
             const response = await fetch(`/cves/list?resultsPerPage=${resultsPerPage}&page=${currentPage}`);
             const data = await response.json();

@@ -5,7 +5,7 @@ import time
 
 app = Flask(__name__)
 
-# Database setup
+# Connect to mysql db
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:root@localhost/cve_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -20,6 +20,9 @@ class CVE(db.Model):
     last_modified = db.Column(db.String(255))
 
     def as_dict(self):
+        """
+        Type conversion to dict for compatability
+        """
         return {
             'cve_id': self.cve_id,
             'description': self.description,
@@ -28,8 +31,11 @@ class CVE(db.Model):
             'last_modified': self.last_modified
         }
 
-# Fetch CVE data from the NVD API
+# Fetch CVE data from the given API
 def fetch_cve_data(start_index=0, results_per_page=10):
+    """
+    Fetches cve data from api endpoint
+    """
     url = f"https://services.nvd.nist.gov/rest/json/cves/2.0"
     params = {
         "resultsPerPage": results_per_page,
@@ -42,6 +48,10 @@ def fetch_cve_data(start_index=0, results_per_page=10):
 
 # Sync CVE data to the database
 def sync_cve_data():
+    """
+    Syncs data gethered from endpoint and stores to mysql table 'cve'
+    Also checks for duplicates and only adds new values
+    """
     offset = 0
     results_per_page = 10
     while True:
@@ -69,6 +79,10 @@ def sync_cve_data():
 
 @app.route('/cves/list', methods=['GET'])
 def list_cves():
+    """
+    To check data in mysql and if it is loaded properly 
+    
+    """
     results_per_page = int(request.args.get('resultsPerPage', 10))
     page = int(request.args.get('page', 1))
     offset = (page - 1) * results_per_page
@@ -79,9 +93,13 @@ def list_cves():
         'cves': [cve.as_dict() for cve in cves]
     })
 
-# Route to trigger data sync (for example purposes)
+# Trigger data sync manually
 @app.route('/')
+
 def index():
+    """
+    Renders the index.html file for frontend
+    """
     return render_template('index.html') 
 @app.route('/sync')
 def sync_cve_data():
