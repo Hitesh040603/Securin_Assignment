@@ -1,6 +1,6 @@
 # CVE Data API
 
-This API provides access to Common Vulnerabilities and Exposures (CVE) data retrieved from the National Vulnerability Database (NVD) API.  It uses Flask for the API framework, SQLAlchemy for database interaction (MySQL), and requests for fetching data from the NVD.
+This API provides access to Common Vulnerabilities and Exposures (CVE) data retrieved from the National Vulnerability Database (NVD) API. It uses Flask for the API framework, SQLAlchemy for database interaction (MySQL), and requests for fetching data from the NVD.
 
 ## Table of Contents
 
@@ -15,16 +15,16 @@ This API provides access to Common Vulnerabilities and Exposures (CVE) data retr
     * [CVEReference](#cvereference)
 * [Error Handling](#error-handling)
 * [Running the API](#running-the-api)
-* [Deployment](#deployment) (Optional)
-* [Testing](#testing) (Optional)
+* [Deployment](#deployment-optional)  *(Note the hyphen for "optional")*
+* [Testing](#testing-optional) *(Note the hyphen for "optional")*
 
-## Introduction
+## Introduction <a name="introduction"></a> 
 
-This API simplifies access to CVE data.  It fetches data from the NVD's CVE 2.0 API, stores it in a local MySQL database, and provides endpoints for retrieving and displaying the information.  This allows for efficient querying and retrieval of CVE details.
+This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 API, stores it in a local MySQL database, and provides endpoints for retrieving and displaying the information. This allows for efficient querying and retrieval of CVE details.
 
-## API Endpoints
+## API Endpoints <a name="api-endpoints"></a>
 
-### Sync Data
+### Sync Data <a name="sync-data"></a>
 
 * **Endpoint:** `/sync`
 * **Method:** `GET`
@@ -34,7 +34,7 @@ This API simplifies access to CVE data.  It fetches data from the NVD's CVE 2.0 
     * `200 OK`:  `{"message": "Data synchronized successfully"}`
     * `500 Internal Server Error`: `{"error": "Error message"}` (e.g., database error, NVD API error)
 
-### List CVEs
+### List CVEs <a name="list-cves"></a>
 
 * **Endpoint:** `/cves/list`
 * **Method:** `GET`
@@ -60,52 +60,52 @@ This API simplifies access to CVE data.  It fetches data from the NVD's CVE 2.0 
     }
     ```
 
-### Get CVE Details
+### Get CVE Details <a name="get-cve-details"></a>
 
 * **Endpoint:** `/cves/<cve_id>`
 * **Method:** `GET`
-* **Description:** Retrieves detailed information about a specific CVE.  Renders the data using an HTML template (`cve_detail.html`).
+* **Description:** Retrieves detailed information about a specific CVE. Renders the data using an HTML template (`cve_detail.html`).
 * **Request Parameters:**
     * `cve_id` (required): The CVE ID (e.g., CVE-2023-XXXX).
 * **Response:**
     * `200 OK`: HTML page displaying CVE details, descriptions, and references.
     * `404 Not Found`: `{"error": "CVE not found"}`
 
-## Data Models
+## Data Models <a name="data-models"></a>
 
-### CVE
+### CVE <a name="cve"></a>
 
 | Field             | Type    | Description                               |
 |-------------------|---------|-------------------------------------------|
-| id                | Integer | Primary key.                              |
-| cve_id            | String  | CVE identifier (e.g., CVE-2023-XXXX).       |
-| source_identifier | String  | Source identifying the vulnerability.      |
-| published         | Date    | Date of publication.                       |
-| last_modified     | Date    | Date of last modification.                 |
-| vuln_status       | String  | Status of the vulnerability.             |
+| `id`              | Integer | Primary key.                              |
+| `cve_id`          | String  | CVE identifier (e.g., CVE-2023-XXXX).       |
+| `source_identifier` | String  | Source identifying the vulnerability.      |
+| `published`         | Date    | Date of publication.                       |
+| `last_modified`     | Date    | Date of last modification.                 |
+| `vuln_status`       | String  | Status of the vulnerability.             |
 
-### CVEDescription
+### CVEDescription <a name="cvedescription"></a>
 
 | Field       | Type    | Description                                 |
 |-------------|---------|---------------------------------------------|
-| id          | Integer | Primary key.                                |
-| cve_id      | String  | Foreign key referencing CVE.cve_id.         |
-| lang        | String  | Language of the description.                 |
-| description | Text    | Detailed description of the vulnerability. |
+| `id`          | Integer | Primary key.                                |
+| `cve_id`      | String  | Foreign key referencing CVE.cve_id.         |
+| `lang`        | String  | Language of the description.                 |
+| `description` | Text    | Detailed description of the vulnerability. |
 
-### CVEReference
+### CVEReference <a name="cvereference"></a>
 
 | Field   | Type    | Description                               |
 |---------|---------|-------------------------------------------|
-| id      | Integer | Primary key.                              |
-| cve_id  | String  | Foreign key referencing CVE.cve_id.       |
-| url     | String  | URL reference related to the CVE.         |
+| `id`      | Integer | Primary key.                              |
+| `cve_id`  | String  | Foreign key referencing CVE.cve_id.       |
+| `url`     | String  | URL reference related to the CVE.         |
 
-## Error Handling
+## Error Handling <a name="error-handling"></a>
 
-The API uses standard HTTP status codes to indicate the outcome of a request.  Error responses typically include a JSON object with an "error" key containing a descriptive error message.
+The API uses standard HTTP status codes to indicate the outcome of a request. Error responses typically include a JSON object with an "error" key containing a descriptive error message.
 
-## Running the API
+## Running the API <a name="running-the-api"></a>
 
 1.  **Clone the repository:** `git clone <repository_url>` (Replace with your repository URL).
 2.  **Install dependencies:** `pip install -r requirements.txt` (Create a `requirements.txt` file listing Flask, Flask-SQLAlchemy, requests, and mysql-connector-python).
@@ -113,7 +113,3 @@ The API uses standard HTTP status codes to indicate the outcome of a request.  E
 4.  **Create the database:** Create the `cve_db` database in MySQL.
 5.  **Run the application:** `python your_app_file.py` (replace with your python file name).
 
-
-
-```bash
-curl http://localhost:5000/cves/list
