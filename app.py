@@ -5,7 +5,7 @@ import requests
 app = Flask(__name__)
 
 # Connect to MySQL database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:root@localhost/cve_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://user:passwrod@localhost/cve_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
