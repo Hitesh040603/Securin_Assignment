@@ -11,6 +11,9 @@
     <p><strong>Published:</strong> {{ cve['published'] }}</p>
     <p><strong>Last Modified:</strong> {{ cve['last_modified'] }}</p>
     <p><strong>Vulnerability Status:</strong> {{ cve['vuln_status'] }}</p>
+    <p><strong>CVSS Score:</strong> {{ cve['cvss_score'] }}</p>
+    <p><strong>Base Severity:</strong> {{ cve['base_severity'] }}</p>
+
     <p><strong>Description:</strong></p>
     <ul>
         {% for description in descriptions %}
@@ -22,6 +25,13 @@
     <ul>
         {% for ref in references %}
             <li><a href="{{ ref['url'] }}" target="_blank">{{ ref['url'] }}</a></li>
+        {% endfor %}
+    </ul>
+
+    <h3>Weaknesses</h3>
+    <ul>
+        {% for weakness in weaknesses %}
+            <li>{{ weakness['description'] }}</li>
         {% endfor %}
     </ul>
 
