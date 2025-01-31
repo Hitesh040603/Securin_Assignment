@@ -123,12 +123,7 @@ The API uses standard HTTP status codes to indicate the outcome of a request. Er
 
 1.  **Clone the repository:** `git clone https://github.com/Hitesh040603/Securin_Assignment`.
 2.  **Configure the database:** Update the `SQLALCHEMY_DATABASE_URI` in the code to match your MySQL database credentials.
-<<<<<<< HEAD
 3.  **Create the database using the script:** .
    `mysql -u root -p cve_db < /path/to/create_cve_tables.sql`
-5.  **Run the application:** `python app.py`
-=======
-3.  **Create the database:** Create the `cve_db` database in MySQL.
 4.  **Run the application:** `python app.py`
->>>>>>> bc2fd77 (alterred cve_detail.html)
 
