@@ -1,11 +1,11 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template,redirect
 from flask_sqlalchemy import SQLAlchemy
 import requests
 
 app = Flask(__name__)
 
 # Connect to MySQL database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://username:password@localhost/cve_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:root@localhost/cve_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -205,9 +205,13 @@ def get_cve_details(cve_id):
         weaknesses=[weakness.as_dict() for weakness in weaknesses]
     )
 
-@app.route('/')
+@app.route('/cve/list')
 def index():
     return render_template('index.html')
+
+@app.route('/')
+def default():
+    return redirect('/cve/list') 
 
 if __name__ == '__main__':
     app.run(debug=True)
