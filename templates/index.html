@@ -42,10 +42,10 @@
         <thead>
             <tr>
                 <th>CVE ID</th>
-                <th>Description</th>
-                <th>Score</th>
+                <th>Source Identifier</th>
                 <th>Published</th>
                 <th>Last Modified</th>
+                <th>Vulnerability Status</th>
             </tr>
         </thead>
         <tbody>
@@ -73,7 +73,6 @@
         let totalPages = 1;
         let resultsPerPage = 10;
 
-        // Function to fetch CVE data from the backend
         async function loadCves() {
             const response = await fetch(`/cves/list?resultsPerPage=${resultsPerPage}&page=${currentPage}`);
             const data = await response.json();
@@ -84,16 +83,16 @@
             }
 
             const tableBody = document.querySelector('#cveTable tbody');
-            tableBody.innerHTML = ''; // Clear previous data
+            tableBody.innerHTML = '';
 
             data.cves.forEach(cve => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${cve.cve_id}</td>
-                    <td>${cve.description}</td>
-                    <td>${cve.score}</td>
+                    <td>${cve.source_identifier}</td>
                     <td>${cve.published}</td>
                     <td>${cve.last_modified}</td>
+                    <td>${cve.vuln_status}</td>
                 `;
                 tableBody.appendChild(row);
             });
@@ -101,11 +100,9 @@
             totalPages = Math.ceil(data.totalRecords / resultsPerPage);
             document.getElementById('currentPage').textContent = currentPage;
 
-            // Update pagination buttons
             updatePaginationButtons();
         }
 
-        // Function to handle page changes (prev/next)
         function changePage(direction) {
             if (direction === 'prev' && currentPage > 1) {
                 currentPage--;
@@ -115,20 +112,17 @@
             loadCves();
         }
 
-        // Function to handle the "Results Per Page" selection change
         document.getElementById('resultsPerPage').addEventListener('change', function() {
             resultsPerPage = parseInt(this.value);
-            currentPage = 1;  // Reset to the first page when changing results per page
+            currentPage = 1;
             loadCves();
         });
 
-        // Function to update the pagination buttons
         function updatePaginationButtons() {
             document.getElementById('prevPage').classList.toggle('disabled', currentPage === 1);
             document.getElementById('nextPage').classList.toggle('disabled', currentPage === totalPages);
         }
 
-        // Initial data load when the page loads
         loadCves();
     </script>
 </body>
