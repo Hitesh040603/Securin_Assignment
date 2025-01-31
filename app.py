@@ -5,7 +5,7 @@ import requests
 app = Flask(__name__)
 
 # Connect to MySQL database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://user:passwrod@localhost/cve_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://username:password@localhost/cve_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -17,9 +17,9 @@ class CVE(db.Model):
     published = db.Column(db.Date, nullable=False)
     last_modified = db.Column(db.Date, nullable=False)
     vuln_status = db.Column(db.String(255), nullable=False)
-
-    descriptions = db.relationship('CVEDescription', backref='cve', lazy=True)
-    references = db.relationship('CVEReference', backref='cve', lazy=True)
+    cvss_score = db.Column(db.Float)  # Store CVSS score
+    base_severity = db.Column(db.String(50))  # Store CVSS base severity
+    weaknesses = db.relationship('CVEWeakness', backref='cve', lazy=True)
 
     def as_dict(self):
         return {
@@ -27,7 +27,9 @@ class CVE(db.Model):
             'source_identifier': self.source_identifier,
             'published': self.published,
             'last_modified': self.last_modified,
-            'vuln_status': self.vuln_status
+            'vuln_status': self.vuln_status,
+            'cvss_score': self.cvss_score,  # Include CVSS score
+            'base_severity': self.base_severity  # Include base severity
         }
 
 class CVEDescription(db.Model):
@@ -35,12 +37,13 @@ class CVEDescription(db.Model):
     cve_id = db.Column(db.String(255), db.ForeignKey('cve.cve_id'), nullable=False)
     lang = db.Column(db.String(10), nullable=False)
     description = db.Column(db.Text, nullable=False)
-
+    
     def as_dict(self):
         return {
             'lang': self.lang,
             'description': self.description
         }
+
 
 class CVEReference(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,64 +53,118 @@ class CVEReference(db.Model):
     def as_dict(self):
         return {'url': self.url}
 
+class CVEWeakness(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cve_id = db.Column(db.String(255), db.ForeignKey('cve.cve_id'), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    def as_dict(self):
+        return {'description': self.description}
+
 def fetch_cve_data(start_index=0, results_per_page=10):
+    """
+    fetches data from given nvd endpoint and returns as json
+    """
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     params = {"resultsPerPage": results_per_page, "startIndex": start_index}
     response = requests.get(url, params=params)
     return response.json()
 
 def sync_cve_data():
+    """
+    Syncs CVE data from the NVD API and stores it in the local database.
+    Loops through multiple pages to fetch more than 1000 records.
+    """
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-    params = {"resultsPerPage": 1000, "startIndex": 0}
+    results_per_page = 1000
+    start_index = 0
 
-    try:
-        response = requests.get(url, params=params)
-        data = response.json()
+    while True:
+        params = {"resultsPerPage": results_per_page, "startIndex": start_index}
+        
+        try:
+            response = requests.get(url, params=params)
+            data = response.json()
 
-        if 'vulnerabilities' in data:
-            for item in data['vulnerabilities']:
-                cve_data = item['cve']
-                cve_id = cve_data['id']
-                sourceIdentifier = cve_data.get('sourceIdentifier', 'N/A')
-                published = cve_data['published']
-                last_modified = cve_data['lastModified']
-                vuln_status = cve_data.get('vulnStatus', 'Unknown')
+            if 'vulnerabilities' in data:
+                # If there are vulnerabilities, process them
+                for item in data['vulnerabilities']:
+                    cve_data = item['cve']
+                    cve_id = cve_data['id']
+                    sourceIdentifier = cve_data.get('sourceIdentifier', 'N/A')
+                    published = cve_data['published']
+                    last_modified = cve_data['lastModified']
+                    vuln_status = cve_data.get('vulnStatus', 'Unknown')
 
-                existing_cve = CVE.query.filter_by(cve_id=cve_id).first()
-                if not existing_cve:
-                    new_cve = CVE(
-                        cve_id=cve_id,
-                        source_identifier=sourceIdentifier,
-                        published=published,
-                        last_modified=last_modified,
-                        vuln_status=vuln_status
-                    )
-                    db.session.add(new_cve)
+                    # Extract CVSS metrics if available
+                    cvss_score = None
+                    base_severity = None
+                    if 'metrics' in cve_data:
+                        if 'cvssMetricV2' in cve_data['metrics']:
+                            cvss_score = cve_data['metrics']['cvssMetricV2'][0]['cvssData']['baseScore']
+                            base_severity = cve_data['metrics']['cvssMetricV2'][0]['baseSeverity']
 
-                    if 'descriptions' in cve_data:
-                        for desc in cve_data['descriptions']:
-                            new_description = CVEDescription(
-                                cve_id=cve_id,
-                                lang=desc['lang'],
-                                description=desc['value']
-                            )
-                            db.session.add(new_description)
+                    # Check if CVE already exists in the database
+                    existing_cve = CVE.query.filter_by(cve_id=cve_id).first()
+                    if not existing_cve:
+                        # Create new CVE entry if not already in database
+                        new_cve = CVE(
+                            cve_id=cve_id,
+                            source_identifier=sourceIdentifier,
+                            published=published,
+                            last_modified=last_modified,
+                            vuln_status=vuln_status,
+                            cvss_score=cvss_score,  # Store CVSS score
+                            base_severity=base_severity  # Store CVSS base severity
+                        )
+                        db.session.add(new_cve)
 
-                    if 'references' in cve_data:
-                        for ref in cve_data['references']:
-                            new_reference = CVEReference(
-                                cve_id=cve_id,
-                                url=ref['url']
-                            )
-                            db.session.add(new_reference)
+                        # Add descriptions if available
+                        if 'descriptions' in cve_data:
+                            for desc in cve_data['descriptions']:
+                                new_description = CVEDescription(
+                                    cve_id=cve_id,
+                                    lang=desc['lang'],
+                                    description=desc['value']
+                                )
+                                db.session.add(new_description)
 
-            db.session.commit()
-            return jsonify({"message": "Data synchronized successfully"})
+                        # Add references if available
+                        if 'references' in cve_data:
+                            for ref in cve_data['references']:
+                                new_reference = CVEReference(
+                                    cve_id=cve_id,
+                                    url=ref['url']
+                                )
+                                db.session.add(new_reference)
 
-        return jsonify({"message": "No vulnerabilities found"}), 404
+                        # Add weaknesses if available
+                        if 'weaknesses' in cve_data:
+                            for weakness in cve_data['weaknesses']:
+                                new_weakness = CVEWeakness(
+                                    cve_id=cve_id,
+                                    description=weakness['description'][0]['value'] if 'description' in weakness else 'N/A'
+                                )
+                                db.session.add(new_weakness)
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": "Error fetching data", "details": str(e)}), 500
+                db.session.commit()
+
+                # Check if we've fetched all available CVEs
+                if len(data['vulnerabilities']) < results_per_page:
+                    # If the number of vulnerabilities is less than the results per page, stop fetching more
+                    break
+
+                # Increment the start index to fetch the next page of data
+                start_index += results_per_page
+
+            else:
+                # No vulnerabilities found in the response
+                return jsonify({"message": "No vulnerabilities found"}), 404
+
+        except requests.exceptions.RequestException as e:
+            return jsonify({"error": "Error fetching data", "details": str(e)}), 500
+
+    return jsonify({"message": "Data synchronized successfully"})
 
 @app.route('/sync')
 def trigger_sync():
@@ -138,12 +195,14 @@ def get_cve_details(cve_id):
 
     descriptions = CVEDescription.query.filter_by(cve_id=cve_id).all()
     references = CVEReference.query.filter_by(cve_id=cve_id).all()
+    weaknesses = CVEWeakness.query.filter_by(cve_id=cve_id).all()
 
     return render_template(
         'cve_detail.html', 
         cve=cve,
         descriptions=[desc.as_dict() for desc in descriptions],
-        references=[ref.as_dict() for ref in references]
+        references=[ref.as_dict() for ref in references],
+        weaknesses=[weakness.as_dict() for weakness in weaknesses]
     )
 
 @app.route('/')
