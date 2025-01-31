@@ -13,12 +13,15 @@ This API provides access to Common Vulnerabilities and Exposures (CVE) data retr
     * [CVE](#cve)
     * [CVEDescription](#cvedescription)
     * [CVEReference](#cvereference)
+    * [CVEWeakness](#cveweakness)
 * [Error Handling](#error-handling)
 * [Running the API](#running-the-api)
+* [Deployment](#deployment-optional)
+* [Testing](#testing-optional)
 
-## Introduction <a name="introduction"></a> 
+## Introduction <a name="introduction"></a>
 
-This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 API, stores it in a local MySQL database, and provides endpoints for retrieving and displaying the information. This allows for efficient querying and retrieval of CVE details.
+This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 API, stores it in a local MySQL database, and provides endpoints for retrieving and displaying the information. This allows for efficient querying and retrieval of CVE details.  It now also includes CVSS scores, severities, and weakness information.
 
 ## API Endpoints <a name="api-endpoints"></a>
 
@@ -26,7 +29,7 @@ This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 A
 
 * **Endpoint:** `/sync`
 * **Method:** `GET`
-* **Description:** Synchronizes the local database with the latest CVE data from the NVD API. This endpoint is crucial for keeping the data up-to-date. It fetches data in batches (currently 1000 records per request to NVD) and inserts new CVEs, descriptions, and references into the database.
+* **Description:** Synchronizes the local database with the latest CVE data from the NVD API. This endpoint is crucial for keeping the data up-to-date. It fetches data in batches (currently 1000 records per request to NVD) and inserts/updates CVEs, descriptions, references, and weaknesses into the database. It now handles pagination to retrieve all CVEs, not just the first 1000.
 * **Request Parameters:** None
 * **Response:**
     * `200 OK`:  `{"message": "Data synchronized successfully"}`
@@ -38,8 +41,8 @@ This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 A
 * **Method:** `GET`
 * **Description:** Retrieves a list of CVEs. Supports pagination.
 * **Request Parameters:**
-    * `resultsPerPage` (optional): Number of results per page (default: 10).
-    * `page` (optional): Page number (default: 1).
+    * `resultsPerPage` : Number of results per page (default: 10).
+    * `page` : Page number (default: 1).
 * **Response:**
     * `200 OK`:
     ```json
@@ -51,7 +54,9 @@ This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 A
           "source_identifier": "MITRE",
           "published": "2023-10-26",
           "last_modified": "2023-10-27",
-          "vuln_status": "Analyzed"
+          "vuln_status": "Analyzed",
+          "cvss_score": 7.5,  // Example CVSS score
+          "base_severity": "HIGH" // Example base severity
         },
         // ... more CVE objects
       ]
@@ -66,38 +71,49 @@ This API simplifies access to CVE data. It fetches data from the NVD's CVE 2.0 A
 * **Request Parameters:**
     * `cve_id` (required): The CVE ID (e.g., CVE-2023-XXXX).
 * **Response:**
-    * `200 OK`: HTML page displaying CVE details, descriptions, and references.
+    * `200 OK`: HTML page displaying CVE details, descriptions, references, and weaknesses.
     * `404 Not Found`: `{"error": "CVE not found"}`
 
 ## Data Models <a name="data-models"></a>
 
 ### CVE <a name="cve"></a>
 
-| Field             | Type    | Description                               |
-|-------------------|---------|-------------------------------------------|
-| `id`              | Integer | Primary key.                              |
-| `cve_id`          | String  | CVE identifier (e.g., CVE-2023-XXXX).       |
-| `source_identifier` | String  | Source identifying the vulnerability.      |
-| `published`         | Date    | Date of publication.                       |
-| `last_modified`     | Date    | Date of last modification.                 |
-| `vuln_status`       | String  | Status of the vulnerability.             |
+| Field             | Type    | Description                                                              |
+|-------------------|---------|--------------------------------------------------------------------------|
+| `id`              | Integer | Primary key.                                                             |
+| `cve_id`          | String  | CVE identifier (e.g., CVE-2023-XXXX).                                  |
+| `source_identifier` | String  | Source identifying the vulnerability.                                     |
+| `published`         | Date    | Date of publication.                                                      |
+| `last_modified`     | Date    | Date of last modification.                                                |
+| `vuln_status`       | String  | Status of the vulnerability.                                            |
+| `cvss_score`        | Float   | CVSS base score (if available).                                          |
+| `base_severity`    | String  | CVSS base severity (if available).                                       |
 
 ### CVEDescription <a name="cvedescription"></a>
 
-| Field       | Type    | Description                                 |
-|-------------|---------|---------------------------------------------|
-| `id`          | Integer | Primary key.                                |
-| `cve_id`      | String  | Foreign key referencing CVE.cve_id.         |
-| `lang`        | String  | Language of the description.                 |
-| `description` | Text    | Detailed description of the vulnerability. |
+| Field       | Type    | Description                                         |
+|-------------|---------|-----------------------------------------------------|
+| `id`          | Integer | Primary key.                                        |
+| `cve_id`      | String  | Foreign key referencing CVE.cve_id.                 |
+| `lang`        | String  | Language of the description.                         |
+| `description` | Text    | Detailed description of the vulnerability.         |
 
 ### CVEReference <a name="cvereference"></a>
 
-| Field   | Type    | Description                               |
-|---------|---------|-------------------------------------------|
-| `id`      | Integer | Primary key.                              |
-| `cve_id`  | String  | Foreign key referencing CVE.cve_id.       |
-| `url`     | String  | URL reference related to the CVE.         |
+| Field   | Type    | Description                                   |
+|---------|---------|-----------------------------------------------|
+| `id`      | Integer | Primary key.                                  |
+| `cve_id`  | String  | Foreign key referencing CVE.cve_id.           |
+| `url`     | String  | URL reference related to the CVE.             |
+
+### CVEWeakness <a name="cveweakness"></a>
+
+| Field       | Type    | Description                                         |
+|-------------|---------|-----------------------------------------------------|
+| `id`          | Integer | Primary key.                                        |
+| `cve_id`      | String  | Foreign key referencing CVE.cve_id.                 |
+| `description` | Text    | Description of the weakness associated with the CVE. |
+
 
 ## Error Handling <a name="error-handling"></a>
 
@@ -105,9 +121,8 @@ The API uses standard HTTP status codes to indicate the outcome of a request. Er
 
 ## Running the API <a name="running-the-api"></a>
 
-1.  **Clone the repository:** `git clone <repository_url>` (Replace with your repository URL).
-2.  **Install dependencies:** `pip install -r requirements.txt` (Create a `requirements.txt` file listing Flask, Flask-SQLAlchemy, requests, and mysql-connector-python).
-3.  **Configure the database:** Update the `SQLALCHEMY_DATABASE_URI` in the code to match your MySQL database credentials.
-4.  **Create the database:** Create the `cve_db` database in MySQL.
-5.  **Run the application:** `python your_app_file.py` (replace with your python file name).
+1.  **Clone the repository:** `git clone https://github.com/Hitesh040603/Securin_Assignment`.
+2.  **Configure the database:** Update the `SQLALCHEMY_DATABASE_URI` in the code to match your MySQL database credentials.
+3.  **Create the database:** Create the `cve_db` database in MySQL.
+4.  **Run the application:** `python app.py`
 
