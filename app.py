@@ -1,7 +1,6 @@
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 import requests
-import time
 
 app = Flask(__name__)
 
@@ -15,12 +14,14 @@ class CVE(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     cve_id = db.Column(db.String(255), unique=True, nullable=False)
     source_identifier = db.Column(db.String(255), nullable=False)
-    published = db.Column(db.String(255), nullable=False)
-    last_modified = db.Column(db.String(255), nullable=False)
+    published = db.Column(db.Date, nullable=False)
+    last_modified = db.Column(db.Date, nullable=False)
     vuln_status = db.Column(db.String(255), nullable=False)
 
+    descriptions = db.relationship('CVEDescription', backref='cve', lazy=True)
+    references = db.relationship('CVEReference', backref='cve', lazy=True)
+
     def as_dict(self):
-        """Convert to dictionary for JSON response."""
         return {
             'cve_id': self.cve_id,
             'source_identifier': self.source_identifier,
@@ -29,17 +30,32 @@ class CVE(db.Model):
             'vuln_status': self.vuln_status
         }
 
-# Fetch CVE data from NVD API
+class CVEDescription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cve_id = db.Column(db.String(255), db.ForeignKey('cve.cve_id'), nullable=False)
+    lang = db.Column(db.String(10), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    def as_dict(self):
+        return {
+            'lang': self.lang,
+            'description': self.description
+        }
+
+class CVEReference(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cve_id = db.Column(db.String(255), db.ForeignKey('cve.cve_id'), nullable=False)
+    url = db.Column(db.String(255), nullable=False)
+
+    def as_dict(self):
+        return {'url': self.url}
+
 def fetch_cve_data(start_index=0, results_per_page=10):
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-    params = {
-        "resultsPerPage": results_per_page,
-        "startIndex": start_index
-    }
+    params = {"resultsPerPage": results_per_page, "startIndex": start_index}
     response = requests.get(url, params=params)
     return response.json()
 
-# Sync CVE data to MySQL
 def sync_cve_data():
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     params = {"resultsPerPage": 1000, "startIndex": 0}
@@ -52,12 +68,11 @@ def sync_cve_data():
             for item in data['vulnerabilities']:
                 cve_data = item['cve']
                 cve_id = cve_data['id']
-                sourceIdentifier = cve_data.get('sourceIdentifier', 'N/A')  # Fetching identifier
+                sourceIdentifier = cve_data.get('sourceIdentifier', 'N/A')
                 published = cve_data['published']
                 last_modified = cve_data['lastModified']
-                vuln_status = cve_data.get('vulnStatus', 'Unknown')  # Get all vulnStatus values
+                vuln_status = cve_data.get('vulnStatus', 'Unknown')
 
-                # Check if CVE already exists
                 existing_cve = CVE.query.filter_by(cve_id=cve_id).first()
                 if not existing_cve:
                     new_cve = CVE(
@@ -65,9 +80,26 @@ def sync_cve_data():
                         source_identifier=sourceIdentifier,
                         published=published,
                         last_modified=last_modified,
-                        vuln_status=vuln_status  # Save all statuses
+                        vuln_status=vuln_status
                     )
                     db.session.add(new_cve)
+
+                    if 'descriptions' in cve_data:
+                        for desc in cve_data['descriptions']:
+                            new_description = CVEDescription(
+                                cve_id=cve_id,
+                                lang=desc['lang'],
+                                description=desc['value']
+                            )
+                            db.session.add(new_description)
+
+                    if 'references' in cve_data:
+                        for ref in cve_data['references']:
+                            new_reference = CVEReference(
+                                cve_id=cve_id,
+                                url=ref['url']
+                            )
+                            db.session.add(new_reference)
 
             db.session.commit()
             return jsonify({"message": "Data synchronized successfully"})
@@ -79,7 +111,6 @@ def sync_cve_data():
 
 @app.route('/sync')
 def trigger_sync():
-    """Manually trigger CVE data synchronization"""
     try:
         sync_cve_data()
         return jsonify({"message": "Data synchronized successfully"})
@@ -88,7 +119,6 @@ def trigger_sync():
 
 @app.route('/cves/list', methods=['GET'])
 def list_cves():
-    """Fetch paginated CVE data from the database."""
     results_per_page = int(request.args.get('resultsPerPage', 10))
     page = int(request.args.get('page', 1))
     offset = (page - 1) * results_per_page
@@ -100,9 +130,24 @@ def list_cves():
         'cves': [cve.as_dict() for cve in cves]
     })
 
+@app.route('/cves/<cve_id>', methods=['GET'])
+def get_cve_details(cve_id):
+    cve = CVE.query.filter_by(cve_id=cve_id).first()
+    if not cve:
+        return jsonify({"error": "CVE not found"}), 404
+
+    descriptions = CVEDescription.query.filter_by(cve_id=cve_id).all()
+    references = CVEReference.query.filter_by(cve_id=cve_id).all()
+
+    return render_template(
+        'cve_detail.html', 
+        cve=cve,
+        descriptions=[desc.as_dict() for desc in descriptions],
+        references=[ref.as_dict() for ref in references]
+    )
+
 @app.route('/')
 def index():
-    """Render the frontend"""
     return render_template('index.html')
 
 if __name__ == '__main__':

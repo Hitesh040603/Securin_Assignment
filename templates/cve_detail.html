@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ cve['cve_id'] }} - CVE Details</title>
+</head>
+<body>
+    <h1>{{ cve['cve_id'] }} - CVE Details</h1>
+    <p><strong>Source Identifier:</strong> {{ cve['source_identifier'] }}</p>
+    <p><strong>Published:</strong> {{ cve['published'] }}</p>
+    <p><strong>Last Modified:</strong> {{ cve['last_modified'] }}</p>
+    <p><strong>Vulnerability Status:</strong> {{ cve['vuln_status'] }}</p>
+    <p><strong>Description:</strong></p>
+    <ul>
+        {% for description in descriptions %}
+            <li>{{ description['description'] }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3>References</h3>
+    <ul>
+        {% for ref in references %}
+            <li><a href="{{ ref['url'] }}" target="_blank">{{ ref['url'] }}</a></li>
+        {% endfor %}
+    </ul>
+
+    <a href="/">Back to CVE List</a>
+</body>
+</html>

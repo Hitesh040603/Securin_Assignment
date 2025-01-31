@@ -4,126 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CVE List</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ddd;
-            border-collapse: collapse;
-            padding: 8px;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        th, td {
-            text-align: left;
-        }
-        #pagination {
-            margin-top: 20px;
-        }
-        select, button {
-            padding: 5px 10px;
-            margin: 5px;
-        }
-        .pagination-button {
-            cursor: pointer;
-        }
-        .disabled {
-            color: gray;
-            cursor: not-allowed;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </head>
 <body>
-    <h1>CVE List</h1>
-    <table id="cveTable">
-        <thead>
-            <tr>
-                <th>CVE ID</th>
-                <th>Source Identifier</th>
-                <th>Published</th>
-                <th>Last Modified</th>
-                <th>Vulnerability Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Data inserted here -->
-        </tbody>
-    </table>
-    
-    <div>
-        <label for="resultsPerPage">Results Per Page:</label>
-        <select id="resultsPerPage">
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-        </select>
-    </div>
-    
-    <div id="pagination">
-        <button id="prevPage" class="pagination-button disabled" onclick="changePage('prev')">Prev</button>
-        <span id="currentPage">1</span>
-        <button id="nextPage" class="pagination-button" onclick="changePage('next')">Next</button>
+    <div class="container">
+        <h1 class="my-4">CVE List</h1>
+        <div class="form-inline mb-3">
+            <label for="resultsPerPage" class="mr-2">Results Per Page:</label>
+            <select id="resultsPerPage" class="form-control">
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+
+        <table class="table table-bordered" border="1" width="100%">
+            <thead>
+                <tr>
+                    <th>CVE ID</th>
+                    <th>Source Identifier</th>
+                    <th>Published</th>
+                    <th>Last Modified</th>
+                    <th>Vulnerability Status</th>
+                </tr>
+            </thead>
+            <tbody id="cveList">
+                <!-- CVE rows will be dynamically inserted here -->
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between">
+            <button id="prevButton" class="btn btn-primary" onclick="changePage(currentPage - 1)" disabled>Previous</button>
+            <button id="nextButton" class="btn btn-primary" onclick="changePage(currentPage + 1)">Next</button>
+        </div>
     </div>
 
     <script>
         let currentPage = 1;
-        let totalPages = 1;
         let resultsPerPage = 10;
+        let totalPages = 1;
 
-        async function loadCves() {
-            const response = await fetch(`/cves/list?resultsPerPage=${resultsPerPage}&page=${currentPage}`);
-            const data = await response.json();
-            
-            if (data.cves.length === 0) {
-                alert("No CVEs found!");
-                return;
-            }
+        function fetchCVEs() {
+            $.get(`/cves/list?resultsPerPage=${resultsPerPage}&page=${currentPage}`, function(data) {
+                const cveList = $('#cveList');
+                cveList.empty();
 
-            const tableBody = document.querySelector('#cveTable tbody');
-            tableBody.innerHTML = '';
+                // Append CVE rows
+                data.cves.forEach(cve => {
+                    const cveRow = `<tr onclick="window.location='/cves/${cve.cve_id}'">
+                        <td>${cve.cve_id}</td>
+                        <td>${cve.source_identifier}</td>
+                        <td>${cve.published}</td>
+                        <td>${cve.last_modified}</td>
+                        <td>${cve.vuln_status}</td>
+                    </tr>`;
+                    cveList.append(cveRow);
+                });
 
-            data.cves.forEach(cve => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${cve.cve_id}</td>
-                    <td>${cve.source_identifier}</td>
-                    <td>${cve.published}</td>
-                    <td>${cve.last_modified}</td>
-                    <td>${cve.vuln_status}</td>
-                `;
-                tableBody.appendChild(row);
+                // Update total pages
+                totalPages = Math.ceil(data.totalRecords / resultsPerPage);
+
+                // Enable or disable buttons
+                $('#prevButton').prop('disabled', currentPage === 1);
+                $('#nextButton').prop('disabled', currentPage === totalPages);
+            });
+        }
+
+        function changePage(page) {
+            if (page < 1 || page > totalPages) return;  // Ensure valid page
+            currentPage = page;
+            fetchCVEs();
+        }
+
+        $(document).ready(function() {
+            resultsPerPage = $('#resultsPerPage').val();
+            $('#resultsPerPage').change(function() {
+                resultsPerPage = $(this).val();
+                currentPage = 1;  // Reset to first page when results per page changes
+                fetchCVEs();
             });
 
-            totalPages = Math.ceil(data.totalRecords / resultsPerPage);
-            document.getElementById('currentPage').textContent = currentPage;
-
-            updatePaginationButtons();
-        }
-
-        function changePage(direction) {
-            if (direction === 'prev' && currentPage > 1) {
-                currentPage--;
-            } else if (direction === 'next' && currentPage < totalPages) {
-                currentPage++;
-            }
-            loadCves();
-        }
-
-        document.getElementById('resultsPerPage').addEventListener('change', function() {
-            resultsPerPage = parseInt(this.value);
-            currentPage = 1;
-            loadCves();
+            fetchCVEs();
         });
-
-        function updatePaginationButtons() {
-            document.getElementById('prevPage').classList.toggle('disabled', currentPage === 1);
-            document.getElementById('nextPage').classList.toggle('disabled', currentPage === totalPages);
-        }
-
-        loadCves();
     </script>
 </body>
 </html>
