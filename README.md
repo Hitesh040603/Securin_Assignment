@@ -16,8 +16,7 @@ This API provides access to Common Vulnerabilities and Exposures (CVE) data retr
     * [CVEWeakness](#cveweakness)
 * [Error Handling](#error-handling)
 * [Running the API](#running-the-api)
-* [Deployment](#deployment-optional)
-* [Testing](#testing-optional)
+
 
 ## Introduction <a name="introduction"></a>
 
