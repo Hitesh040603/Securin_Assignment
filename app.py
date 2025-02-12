@@ -179,13 +179,32 @@ def list_cves():
     results_per_page = int(request.args.get('resultsPerPage', 10))
     page = int(request.args.get('page', 1))
     offset = (page - 1) * results_per_page
-    cves = CVE.query.offset(offset).limit(results_per_page).all()
-    total_records = CVE.query.count()
+
+    query = CVE.query
+
+    # Apply filters
+    if request.args.get('cve_id'):
+        query = query.filter(CVE.cve_id.like(f"%{request.args['cve_id']}%"))
+
+    if request.args.get('year'):
+        query = query.filter(db.extract('year', CVE.published) == int(request.args['year']))
+
+    if request.args.get('score'):
+        query = query.filter(CVE.cvss_score >= float(request.args['score']))
+
+    if request.args.get('days'):
+        from datetime import datetime, timedelta
+        days_ago = datetime.utcnow() - timedelta(days=int(request.args['days']))
+        query = query.filter(CVE.last_modified >= days_ago)
+
+    total_records = query.count()
+    cves = query.offset(offset).limit(results_per_page).all()
 
     return jsonify({
         'totalRecords': total_records,
         'cves': [cve.as_dict() for cve in cves]
     })
+
 
 @app.route('/cves/<cve_id>', methods=['GET'])
 def get_cve_details(cve_id):

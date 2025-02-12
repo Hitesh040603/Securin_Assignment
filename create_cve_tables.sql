@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS CVE (
 );
 
 -- Create the CVEDescription table
-CREATE TABLE IF NOT EXISTS CVEDescription (
+CREATE TABLE IF NOT EXISTS CVE_Description (
     id INT AUTO_INCREMENT PRIMARY KEY,
     cve_id VARCHAR(255),
     lang VARCHAR(10) NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS CVEDescription (
 );
 
 -- Create the CVEReference table
-CREATE TABLE IF NOT EXISTS CVEReference (
+CREATE TABLE IF NOT EXISTS CVE_Reference (
     id INT AUTO_INCREMENT PRIMARY KEY,
     cve_id VARCHAR(255),
     url VARCHAR(255) NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS CVEReference (
 );
 
 -- Create the CVEWeakness table
-CREATE TABLE IF NOT EXISTS CVEWeakness (
+CREATE TABLE IF NOT EXISTS CVE_Weakness (
     id INT AUTO_INCREMENT PRIMARY KEY,
     cve_id VARCHAR(255),
     description TEXT NOT NULL,

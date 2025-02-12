@@ -12,16 +12,27 @@
 <body>
     <div class="container">
         <h1 class="my-4">CVE List</h1>
-        <div class="form-inline mb-3">
-            <label for="resultsPerPage" class="mr-2">Results Per Page:</label>
-            <select id="resultsPerPage" class="form-control">
-                <option value="10">10</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
+
+        <!-- Filters -->
+        <div class="form-row mb-3" >
+           
+                <input type="text" id="cveIdFilter" class="form-control" placeholder="CVE ID (e.g., CVE-2023-1234)">
+            
+            
+                <input type="number" id="yearFilter" class="form-control" placeholder="Year (e.g., 2023)">
+            
+                <input type="number" id="scoreFilter" class="form-control" placeholder="CVE Score (e.g., 7.5)">
+            
+                <input type="number" id="daysFilter" class="form-control" placeholder="Last Modified (N Days)">
+            
+            <div class="col">
+                <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
+            </div>
         </div>
 
-        <table class="table table-bordered" border="1" width="100%">
+        
+
+        <table class="table table-bordered" border="1" width="100%" >
             <thead>
                 <tr>
                     <th>CVE ID</th>
@@ -31,14 +42,23 @@
                     <th>Vulnerability Status</th>
                 </tr>
             </thead>
-            <tbody id="cveList">
-                <!-- CVE rows will be dynamically inserted here -->
-            </tbody>
+            <tbody align="center" id="cveList" ></tbody>
         </table>
+        
 
         <div class="d-flex justify-content-between">
             <button id="prevButton" class="btn btn-primary" onclick="changePage(currentPage - 1)" disabled>Previous</button>
             <button id="nextButton" class="btn btn-primary" onclick="changePage(currentPage + 1)">Next</button>
+        </div>
+
+
+        <div class="form-inline mb-3">
+            <label for="resultsPerPage" class="mr-2">Results Per Page:</label>
+            <select id="resultsPerPage" class="form-control">
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
         </div>
     </div>
 
@@ -48,33 +68,39 @@
         let totalPages = 1;
 
         function fetchCVEs() {
-            $.get(`/cves/list?resultsPerPage=${resultsPerPage}&page=${currentPage}`, function(data) {
+            let filters = {
+                cve_id: $('#cveIdFilter').val(),
+                year: $('#yearFilter').val(),
+                score: $('#scoreFilter').val(),
+                days: $('#daysFilter').val(),
+                resultsPerPage: resultsPerPage,
+                page: currentPage
+            };
+
+            $.get('/cves/list', filters, function(data) {
                 const cveList = $('#cveList');
                 cveList.empty();
 
-                // Append CVE rows
                 data.cves.forEach(cve => {
-                    const cveRow = `<tr onclick="window.location='/cves/${cve.cve_id}'">
-                        <td>${cve.cve_id}</td>
-                        <td>${cve.source_identifier}</td>
-                        <td>${cve.published}</td>
-                        <td>${cve.last_modified}</td>
-                        <td>${cve.vuln_status}</td>
-                    </tr>`;
-                    cveList.append(cveRow);
+                    cveList.append(`
+                        <tr onclick="window.location='/cves/${cve.cve_id}'">
+                            <td>${cve.cve_id}</td>
+                            <td>${cve.source_identifier}</td>
+                            <td>${cve.published}</td>
+                            <td>${cve.last_modified}</td>
+                            <td>${cve.vuln_status}</td>
+                        </tr>
+                    `);
                 });
 
-                // Update total pages
                 totalPages = Math.ceil(data.totalRecords / resultsPerPage);
-
-                // Enable or disable buttons
                 $('#prevButton').prop('disabled', currentPage === 1);
                 $('#nextButton').prop('disabled', currentPage === totalPages);
             });
         }
 
         function changePage(page) {
-            if (page < 1 || page > totalPages) return;  // Ensure valid page
+            if (page < 1 || page > totalPages) return;
             currentPage = page;
             fetchCVEs();
         }
@@ -83,10 +109,11 @@
             resultsPerPage = $('#resultsPerPage').val();
             $('#resultsPerPage').change(function() {
                 resultsPerPage = $(this).val();
-                currentPage = 1;  // Reset to first page when results per page changes
+                currentPage = 1;
                 fetchCVEs();
             });
 
+            $('#applyFilters').click(fetchCVEs);
             fetchCVEs();
         });
     </script>
