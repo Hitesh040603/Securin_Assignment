@@ -194,7 +194,7 @@ def list_cves():
 
     if request.args.get('days'):
         from datetime import datetime, timedelta
-        days_ago = datetime.utcnow() - timedelta(days=int(request.args['days']))
+        days_ago = datetime.now() - timedelta(days=int(request.args['days']))
         query = query.filter(CVE.last_modified >= days_ago)
 
     total_records = query.count()
