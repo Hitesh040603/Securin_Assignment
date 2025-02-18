@@ -17,9 +17,9 @@ class CVE(db.Model):
     published = db.Column(db.Date, nullable=False)
     last_modified = db.Column(db.Date, nullable=False)
     vuln_status = db.Column(db.String(255), nullable=False)
-    cvss_score = db.Column(db.Float)  # Store CVSS score
-    base_severity = db.Column(db.String(50))  # Store CVSS base severity
-    weaknesses = db.relationship('CVEWeakness', backref='cve', lazy=True)
+    cvss_score = db.Column(db.Float)  
+    base_severity = db.Column(db.String(50))  
+    weaknesses = db.relationship('CVEWeakness', backref='cve')
 
     def as_dict(self):
         return {
@@ -28,8 +28,8 @@ class CVE(db.Model):
             'published': self.published,
             'last_modified': self.last_modified,
             'vuln_status': self.vuln_status,
-            'cvss_score': self.cvss_score,  # Include CVSS score
-            'base_severity': self.base_severity  # Include base severity
+            'cvss_score': self.cvss_score,  
+            'base_severity': self.base_severity  
         }
 
 class CVEDescription(db.Model):
@@ -114,8 +114,8 @@ def sync_cve_data():
                             published=published,
                             last_modified=last_modified,
                             vuln_status=vuln_status,
-                            cvss_score=cvss_score,  # Store CVSS score
-                            base_severity=base_severity  # Store CVSS base severity
+                            cvss_score=cvss_score,  
+                            base_severity=base_severity  
                         )
                         db.session.add(new_cve)
 
@@ -168,6 +168,9 @@ def sync_cve_data():
 
 @app.route('/sync')
 def trigger_sync():
+    """
+    Loads data into mysql
+    """
     try:
         sync_cve_data()
         return jsonify({"message": "Data synchronized successfully"})
@@ -176,6 +179,9 @@ def trigger_sync():
 
 @app.route('/cves/list', methods=['GET'])
 def list_cves():
+    """
+    Loads data from mysql and applies filters if applicable
+    """
     results_per_page = int(request.args.get('resultsPerPage', 10))
     page = int(request.args.get('page', 1))
     offset = (page - 1) * results_per_page
@@ -208,6 +214,9 @@ def list_cves():
 
 @app.route('/cves/<cve_id>', methods=['GET'])
 def get_cve_details(cve_id):
+    """
+    Opens cve_details.html for selected cve
+    """
     cve = CVE.query.filter_by(cve_id=cve_id).first()
     if not cve:
         return jsonify({"error": "CVE not found"}), 404
@@ -226,10 +235,16 @@ def get_cve_details(cve_id):
 
 @app.route('/cve/list')
 def index():
+    """
+    renders home page
+    """
     return render_template('index.html')
 
 @app.route('/')
 def default():
+    """
+    Redirects and sets /cve/list as default path
+    """
     return redirect('/cve/list') 
 
 if __name__ == '__main__':

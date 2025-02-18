@@ -83,7 +83,7 @@
 
                 data.cves.forEach(cve => {
                     cveList.append(`
-                        <tr onclick="window.location='/cves/${cve.cve_id}'">
+                        <tr style="cursor: pointer;" onclick="window.location='/cves/${cve.cve_id}'">
                             <td>${cve.cve_id}</td>
                             <td>${cve.source_identifier}</td>
                             <td>${cve.published}</td>
