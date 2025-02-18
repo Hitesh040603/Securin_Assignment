@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, render_template,redirect
 from flask_sqlalchemy import SQLAlchemy
-import requests
+import requests,time
 
 app = Flask(__name__)
 
@@ -70,99 +70,112 @@ def fetch_cve_data(start_index=0, results_per_page=10):
     response = requests.get(url, params=params)
     return response.json()
 
+
+
 def sync_cve_data():
     """
     Syncs CVE data from the NVD API and stores it in the local database.
-    Loops through multiple pages to fetch more than 1000 records.
+    Loops through multiple pages to fetch all available records.
+    Handles API rate limits with retry and incrementally adjusting time between requests
     """
     url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     results_per_page = 1000
     start_index = 0
-
+    max_retries = 5  
     while True:
-        params = {"resultsPerPage": results_per_page, "startIndex": start_index}
-        
-        try:
-            response = requests.get(url, params=params)
-            data = response.json()
+        params = {
+            "resultsPerPage": results_per_page,
+            "startIndex": start_index
+        }
 
-            if 'vulnerabilities' in data:
-                # If there are vulnerabilities, process them
-                for item in data['vulnerabilities']:
-                    cve_data = item['cve']
-                    cve_id = cve_data['id']
-                    sourceIdentifier = cve_data.get('sourceIdentifier', 'N/A')
-                    published = cve_data['published']
-                    last_modified = cve_data['lastModified']
-                    vuln_status = cve_data.get('vulnStatus', 'Unknown')
+        retries = 0
+        while retries < max_retries:
+            try:
+                print(f"Fetching CVEs from index {start_index}...")  
+                response = requests.get(url, params=params)
+                
+                if response.status_code in [503, 429]:  
+                    wait_time = (2 ** retries)  
+                    print(f"Rate limited! Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                    retries += 1
+                    continue  
 
-                    # Extract CVSS metrics if available
-                    cvss_score = None
-                    base_severity = None
-                    if 'metrics' in cve_data:
-                        if 'cvssMetricV2' in cve_data['metrics']:
-                            cvss_score = cve_data['metrics']['cvssMetricV2'][0]['cvssData']['baseScore']
-                            base_severity = cve_data['metrics']['cvssMetricV2'][0]['baseSeverity']
+                response.raise_for_status()  
+                break  
 
-                    # Check if CVE already exists in the database
-                    existing_cve = CVE.query.filter_by(cve_id=cve_id).first()
-                    if not existing_cve:
-                        # Create new CVE entry if not already in database
-                        new_cve = CVE(
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching data: {e}")  
+                return jsonify({"error": "Error fetching data", "details": str(e)}), 500
+
+        data = response.json()
+        if 'vulnerabilities' not in data or not data['vulnerabilities']:
+            print("No more vulnerabilities found. Stopping sync.")
+            break
+
+        vulnerabilities = data['vulnerabilities']
+        print(f"Fetched {len(vulnerabilities)} CVEs from index {start_index}")  # Debug log
+
+        for item in vulnerabilities:
+            cve_data = item['cve']
+            cve_id = cve_data['id']
+            source_identifier = cve_data.get('sourceIdentifier', 'N/A')
+            published = cve_data['published']
+            last_modified = cve_data['lastModified']
+            vuln_status = cve_data.get('vulnStatus', 'Unknown')
+
+            cvss_score = None
+            base_severity = None
+            if 'metrics' in cve_data and 'cvssMetricV2' in cve_data['metrics']:
+                cvss_score = cve_data['metrics']['cvssMetricV2'][0]['cvssData'].get('baseScore')
+                base_severity = cve_data['metrics']['cvssMetricV2'][0].get('baseSeverity')
+
+            existing_cve = CVE.query.filter_by(cve_id=cve_id).first()
+            if not existing_cve:
+                new_cve = CVE(
+                    cve_id=cve_id,
+                    source_identifier=source_identifier,
+                    published=published,
+                    last_modified=last_modified,
+                    vuln_status=vuln_status,
+                    cvss_score=cvss_score,
+                    base_severity=base_severity
+                )
+                db.session.add(new_cve)
+
+                if 'descriptions' in cve_data:
+                    for desc in cve_data['descriptions']:
+                        new_description = CVEDescription(
                             cve_id=cve_id,
-                            source_identifier=sourceIdentifier,
-                            published=published,
-                            last_modified=last_modified,
-                            vuln_status=vuln_status,
-                            cvss_score=cvss_score,  
-                            base_severity=base_severity  
+                            lang=desc['lang'],
+                            description=desc['value']
                         )
-                        db.session.add(new_cve)
+                        db.session.add(new_description)
 
-                        # Add descriptions if available
-                        if 'descriptions' in cve_data:
-                            for desc in cve_data['descriptions']:
-                                new_description = CVEDescription(
-                                    cve_id=cve_id,
-                                    lang=desc['lang'],
-                                    description=desc['value']
-                                )
-                                db.session.add(new_description)
+                if 'references' in cve_data:
+                    for ref in cve_data['references']:
+                        new_reference = CVEReference(
+                            cve_id=cve_id,
+                            url=ref['url']
+                        )
+                        db.session.add(new_reference)
 
-                        # Add references if available
-                        if 'references' in cve_data:
-                            for ref in cve_data['references']:
-                                new_reference = CVEReference(
-                                    cve_id=cve_id,
-                                    url=ref['url']
-                                )
-                                db.session.add(new_reference)
+                if 'weaknesses' in cve_data:
+                    for weakness in cve_data['weaknesses']:
+                        new_weakness = CVEWeakness(
+                            cve_id=cve_id,
+                            description=weakness['description'][0]['value'] if 'description' in weakness else 'N/A'
+                        )
+                        db.session.add(new_weakness)
 
-                        # Add weaknesses if available
-                        if 'weaknesses' in cve_data:
-                            for weakness in cve_data['weaknesses']:
-                                new_weakness = CVEWeakness(
-                                    cve_id=cve_id,
-                                    description=weakness['description'][0]['value'] if 'description' in weakness else 'N/A'
-                                )
-                                db.session.add(new_weakness)
+        db.session.commit()
 
-                db.session.commit()
+        
+        if len(vulnerabilities) < results_per_page:
+            print("Fetched the last page of results. Sync complete.")
+            break
 
-                # Check if we've fetched all available CVEs
-                if len(data['vulnerabilities']) < results_per_page:
-                    # If the number of vulnerabilities is less than the results per page, stop fetching more
-                    break
-
-                # Increment the start index to fetch the next page of data
-                start_index += results_per_page
-
-            else:
-                # No vulnerabilities found in the response
-                return jsonify({"message": "No vulnerabilities found"}), 404
-
-        except requests.exceptions.RequestException as e:
-            return jsonify({"error": "Error fetching data", "details": str(e)}), 500
+        start_index += results_per_page
 
     return jsonify({"message": "Data synchronized successfully"})
 
