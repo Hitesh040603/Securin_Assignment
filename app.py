@@ -255,9 +255,12 @@ def index():
 
 @app.route('/')
 def default():
+<<<<<<< HEAD
     """
     Redirects and sets /cve/list as default path
     """
+=======
+>>>>>>> 8e3c047 (changed paths)
     return redirect('/cve/list') 
 
 if __name__ == '__main__':
